@@ -1,6 +1,5 @@
 import { getColor } from "@/lib/utils";
 import { useAppStore } from "@/store";
-import { HOST } from "@/utils/constants";
 import { Avatar, AvatarImage } from "@radix-ui/react-avatar";
 
 const ContactList = ({ contacts, isChannel = false }) => {
@@ -39,9 +38,9 @@ const ContactList = ({ contacts, isChannel = false }) => {
           <div className="flex gap-5 items-center justify-start text-neutral-300">
             {!isChannel && (
               <Avatar className="h-10 w-10 rounded-full overflow-hidden">
-                {contact.image ? (
+                {contact.image && contact.image.url ? (
                   <AvatarImage
-                    src={`${HOST}/${contact.image}`}
+                    src={contact.image.url}
                     alt="profile"
                     className="object-cover w-full h-full bg-black"
                   />
@@ -54,8 +53,8 @@ const ContactList = ({ contacts, isChannel = false }) => {
                     } uppercase w-10 h-10 text-lg border flex items-center justify-center rounded-full`}
                   >
                     {contact.firstName
-                      ? contact.firstName.split("").shift()
-                      : contact.email.split("").shift()}
+                      ? contact.firstName[0]
+                      : contact.email[0]}
                   </div>
                 )}
               </Avatar>

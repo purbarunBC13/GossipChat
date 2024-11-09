@@ -1,5 +1,15 @@
 import Message from "../models/MessegesModel.js";
-import { mkdirSync, renameSync } from "fs";
+import { v2 as cloudinary } from "cloudinary";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 export const getMessages = async (req, res, next) => {
   try {
     const user1 = req.userId;
@@ -32,15 +42,17 @@ export const uploadFile = async (req, res, next) => {
     if (!req.file) {
       return res.status(400).send("No file uploaded");
     }
-    const date = Date.now();
-    let fileDir = `uploads/files/${date}`;
-    const fileName = `${fileDir}/${req.file.originalname}`;
 
-    mkdirSync(fileDir, { recursive: true });
+    // Upload file to Cloudinary
+    const result = await cloudinary.uploader.upload(req.file.path, {
+      resource_type: "auto", // Allows uploading any file type (e.g., images, videos, PDFs)
+      folder: "uploads/files", // Organize files in Cloudinary
+    });
 
-    renameSync(req.file.path, fileName);
-
-    return res.status(200).send({ filePath: fileName });
+    // Send the URL and public_id of the uploaded file back to the frontend
+    return res
+      .status(200)
+      .send({ filePath: result.secure_url, public_id: result.public_id });
   } catch (error) {
     console.log(error);
     return res.status(500).send("Internal Server Error");

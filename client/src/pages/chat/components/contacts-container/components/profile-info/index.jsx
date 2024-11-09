@@ -8,7 +8,7 @@ import {
 import { FiEdit2 } from "react-icons/fi";
 import { getColor } from "@/lib/utils";
 import { useAppStore } from "@/store";
-import { HOST, LOGIN_ROUTE, LOGOUT_ROUTE } from "@/utils/constants";
+import { LOGIN_ROUTE, LOGOUT_ROUTE } from "@/utils/constants";
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { IoPowerSharp } from "react-icons/io5";
@@ -17,6 +17,7 @@ import { apiClient } from "@/lib/api-client";
 const ProfileInfo = () => {
   const navigate = useNavigate();
   const { userInfo, setUserInfo } = useAppStore();
+
   const logOut = async () => {
     try {
       const response = await apiClient.post(
@@ -34,14 +35,15 @@ const ProfileInfo = () => {
       console.log(error);
     }
   };
+
   return (
     <div className="absolute bottom-0 h-16 flex items-center justify-between px-10 w-full bg-[#2a2b33]">
       <div className="flex gap-3 items-center justify-center">
         <div>
           <Avatar className="h-12 w-12 rounded-full overflow-hidden">
-            {userInfo.image ? (
+            {userInfo.image && userInfo.image.url ? (
               <AvatarImage
-                src={`${HOST}/${userInfo.image}`}
+                src={userInfo.image.url}
                 alt="profile"
                 className="object-cover w-full h-full bg-black"
               />
@@ -51,9 +53,7 @@ const ProfileInfo = () => {
                   userInfo.color
                 )}`}
               >
-                {userInfo.firstName
-                  ? userInfo.firstName.split("").shift()
-                  : userInfo.email.split("").shift()}
+                {userInfo.firstName ? userInfo.firstName[0] : userInfo.email[0]}
               </div>
             )}
           </Avatar>

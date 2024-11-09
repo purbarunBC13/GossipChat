@@ -1,7 +1,17 @@
 import { compare } from "bcrypt";
 import User from "../models/UserModel.js";
 import jwt from "jsonwebtoken";
-import { renameSync, unlinkSync } from "fs";
+import { v2 as cloudinary } from "cloudinary";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 const maxAge = 3 * 24 * 60 * 60 * 1000;
 const createToken = (email, userId) => {
@@ -101,30 +111,40 @@ export const getUserInfo = async (req, res, next) => {
 
 export const updateProfile = async (req, res, next) => {
   try {
-    // console.log(req.userId);
     const { userId } = req;
-    const { firstName, lastName, color } = req.body;
+    const { firstName, lastName, color, image } = req.body;
+
+    // Validate required fields
     if (!firstName || !lastName || color === undefined) {
       return res
         .status(400)
-        .send("First name, last name and color are required");
+        .send("First name, last name, and color are required");
     }
-    const userData = await User.findByIdAndUpdate(
-      userId,
-      {
-        firstName,
-        lastName,
-        color,
-        profileSetup: true,
-      },
-      {
-        new: true,
-        runValidators: true,
-      }
-    );
+
+    // Prepare update data, including optional image info
+    const updateData = {
+      firstName,
+      lastName,
+      color,
+      profileSetup: true,
+    };
+
+    if (image) {
+      updateData.image = {
+        url: image.url,
+        public_id: image.public_id,
+      };
+    }
+
+    const userData = await User.findByIdAndUpdate(userId, updateData, {
+      new: true,
+      runValidators: true,
+    });
+
     if (!userData) {
       return res.status(400).send("User not found");
     }
+
     return res.status(200).json({
       id: userData.id,
       email: userData.email,
@@ -140,28 +160,28 @@ export const updateProfile = async (req, res, next) => {
   }
 };
 
-export const addProfileImage = async (req, res, next) => {
-  try {
-    if (!req.file) {
-      return res.status(400).send("Please upload a file");
-    }
-    const date = Date.now();
-    let filename = "uploads/profiles/" + date + req.file.originalname;
-    renameSync(req.file.path, filename);
+// export const addProfileImage = async (req, res, next) => {
+//   try {
+//     if (!req.file) {
+//       return res.status(400).send("Please upload a file");
+//     }
+//     const date = Date.now();
+//     let filename = "uploads/profiles/" + date + req.file.originalname;
+//     renameSync(req.file.path, filename);
 
-    const updatedUser = await User.findByIdAndUpdate(
-      req.userId,
-      { image: filename },
-      { new: true, runValidators: true }
-    );
-    return res.status(200).json({
-      image: updatedUser.image,
-    });
-  } catch (error) {
-    console.log(error);
-    return res.status(500).send("Internal server error");
-  }
-};
+//     const updatedUser = await User.findByIdAndUpdate(
+//       req.userId,
+//       { image: filename },
+//       { new: true, runValidators: true }
+//     );
+//     return res.status(200).json({
+//       image: updatedUser.image,
+//     });
+//   } catch (error) {
+//     console.log(error);
+//     return res.status(500).send("Internal server error");
+//   }
+// };
 
 export const removeProfileImage = async (req, res, next) => {
   try {
@@ -170,9 +190,18 @@ export const removeProfileImage = async (req, res, next) => {
     if (!user) {
       return res.status(404).send("User not found");
     }
-    if (user.image) {
-      unlinkSync(user.image);
+
+    // Check if the user has an image with a public_id
+    if (user.image && user.image.public_id) {
+      // Delete the image from Cloudinary
+      const result = await cloudinary.uploader.destroy(user.image.public_id);
+
+      if (result.result !== "ok") {
+        return res.status(500).send("Failed to delete image from Cloudinary");
+      }
     }
+
+    // Set user's image field to null and save
     user.image = null;
     await user.save();
 

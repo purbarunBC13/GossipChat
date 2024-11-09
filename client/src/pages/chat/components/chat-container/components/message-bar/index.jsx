@@ -79,31 +79,32 @@ const MessageBar = () => {
 
         if (response.status === 200 && response.data) {
           setIsUploading(false);
+          const fileUrl = response.data.filePath;
           if (selectedChatType === "contact") {
             socket.emit("sendMessage", {
               sender: userInfo.id,
               content: undefined,
               recipient: selectedChatData._id,
               messageType: "file",
-              fileUrl: response.data.filePath,
+              fileUrl, // Cloudinary URL
             });
           } else if (selectedChatType === "channel") {
             socket.emit("send-channel-message", {
               sender: userInfo.id,
               content: undefined,
               messageType: "file",
-              fileUrl: response.data.filePath,
+              fileUrl, // Cloudinary URL
               channelId: selectedChatData._id,
             });
           }
         }
       }
-      // console.log(file);
     } catch (error) {
       setIsUploading(false);
       console.log(error);
     }
   };
+
   return (
     <div className="h-[10vh] bg-[#1c1d25] flex justify-center items-center px-8 mb-6 gap-6">
       <div className="flex-1 flex bg-[#2a2b33] rounded-md items-center gap-5 pr-5">

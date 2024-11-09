@@ -1,6 +1,10 @@
 import { apiClient } from "@/lib/api-client";
 import { useAppStore } from "@/store";
-import { GET_ALL_MESSAGES_ROUTE, HOST } from "@/utils/constants";
+import {
+  GET_ALL_MESSAGES_ROUTE,
+  GET_CHANNEL_MESSAGES_ROUTE,
+  HOST,
+} from "@/utils/constants";
 import moment from "moment";
 import { useEffect, useRef, useState } from "react";
 import { MdFolderZip } from "react-icons/md";
@@ -43,9 +47,28 @@ const MessageContainer = () => {
         console.log(error);
       }
     };
+
+    const getChannelMessages = async () => {
+      try {
+        const response = await apiClient.get(
+          `${GET_CHANNEL_MESSAGES_ROUTE}/${selectedChatData._id}`,
+          {
+            withCredentials: true,
+          }
+        );
+        if (response.data.messages) {
+          // console.log(response.data.messages);
+          setSelectedChatMessages(response.data.messages);
+        }
+      } catch (error) {
+        console.log(error);
+      }
+    };
     if (selectedChatData._id) {
       if (selectedChatType === "contact") {
         getMessages();
+      } else if (selectedChatType === "channel") {
+        getChannelMessages();
       }
     }
   }, [selectedChatData, selectedChatType, setSelectedChatMessages]);
@@ -137,9 +160,10 @@ const MessageContainer = () => {
                 }}
               >
                 <img
-                  src={`${HOST}/${message.fileUrl}`}
+                  src={message.fileUrl} // Use the direct Cloudinary URL
                   height={300}
                   width={300}
+                  alt="Uploaded file"
                 />
               </div>
             ) : (
@@ -149,8 +173,8 @@ const MessageContainer = () => {
                 </span>
                 <span>{message.fileUrl.split("/").pop()}</span>
                 <span
-                  className="bg-black/20 p-3 text-2xl rounded-full hover:bg-black/50 cursior-pointer transition-all duration-300"
-                  onClick={() => downloadFile(message.fileUrl)}
+                  className="bg-black/20 p-3 text-2xl rounded-full hover:bg-black/50 cursor-pointer transition-all duration-300"
+                  onClick={() => window.open(message.fileUrl, "_blank")}
                 >
                   <IoMdArrowRoundDown />
                 </span>
@@ -158,6 +182,7 @@ const MessageContainer = () => {
             )}
           </div>
         )}
+
         <div className="text-xs text-gray-600">
           {moment(message.timestamp).format("LT")}
         </div>
@@ -211,7 +236,7 @@ const MessageContainer = () => {
         {message.messageType === "file" && (
           <div
             className={`${
-              message.sender !== userInfo.id
+              message.sender._id !== userInfo.id
                 ? "bg-[#8417ff]/5 text-[#8417ff]/90 border-[#8417ff]/50"
                 : "bg-[#2a2b33]/5 text-white/80 border-white/20"
             } border inline-block p-4 rounded my-1 max-w-[50%] break-words`}
@@ -224,11 +249,7 @@ const MessageContainer = () => {
                   setImageUrl(message.fileUrl);
                 }}
               >
-                <img
-                  src={`${HOST}/${message.fileUrl}`}
-                  height={300}
-                  width={300}
-                />
+                <img src={message.fileUrl} height={300} width={300} />
               </div>
             ) : (
               <div className="flex items-center justify-center gap-4 flex-wrap">

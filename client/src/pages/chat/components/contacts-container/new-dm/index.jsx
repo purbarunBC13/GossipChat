@@ -107,21 +107,24 @@ const NewDM = () => {
                   >
                     <div>
                       <Avatar className="h-12 w-12 rounded-full overflow-hidden">
-                        {contact.image ? (
+                        {contact.image && contact.image.url ? (
                           <AvatarImage
-                            src={`${HOST}/${contact.image}`}
+                            src={contact.image.url}
                             alt="profile"
                             className="object-cover w-full h-full bg-black"
                           />
                         ) : (
                           <div
-                            className={`uppercase w-12 h-12 text-lg border flex items-center justify-center rounded-full ${getColor(
-                              contact.color
-                            )}`}
+                            className={`${
+                              selectedChatData &&
+                              selectedChatData._id === contact._id
+                                ? "bg-[#ffffff22] border-2 border-white/70"
+                                : getColor(contact.color)
+                            } uppercase w-10 h-10 text-lg border flex items-center justify-center rounded-full`}
                           >
                             {contact.firstName
-                              ? contact.firstName.split("").shift()
-                              : contact.email.split("").shift()}
+                              ? contact.firstName[0]
+                              : contact.email[0]}
                           </div>
                         )}
                       </Avatar>

@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import {genSalt, hash} from 'bcrypt';
+import { genSalt, hash } from "bcrypt";
 
 const userSchema = new mongoose.Schema({
   email: {
@@ -20,8 +20,8 @@ const userSchema = new mongoose.Schema({
     required: false,
   },
   image: {
-    type: String,
-    required: false,
+    url: { type: String }, // URL of the uploaded image
+    public_id: { type: String }, // Public ID for the image on Cloudinary
   },
   color: {
     type: Number,
@@ -33,10 +33,10 @@ const userSchema = new mongoose.Schema({
   },
 });
 
-userSchema.pre("save",async function(next){
-    const salt = await genSalt(10);
-    this.password = await hash(this.password, salt);
-    next();
+userSchema.pre("save", async function (next) {
+  const salt = await genSalt(10);
+  this.password = await hash(this.password, salt);
+  next();
 });
 
 const User = mongoose.model("Users", userSchema);

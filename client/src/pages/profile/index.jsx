@@ -8,9 +8,12 @@ import { colors, getColor } from "@/lib/utils";
 import { FaTrash, FaPlus } from "react-icons/fa";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ADD_PROFILE_IMAGE_ROUTE, HOST, REMOVE_PROFILE_IMAGE_ROUTE, UPDATE_PROFILE_ROUTE } from "@/utils/constants";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
+import {
+  REMOVE_PROFILE_IMAGE_ROUTE,
+  UPDATE_PROFILE_ROUTE,
+} from "@/utils/constants";
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -18,10 +21,14 @@ const Profile = () => {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [image, setImage] = useState(null);
+  const [publicId, setPublicId] = useState(null);
   const [hovered, setHovered] = useState(false);
   const [selectedColor, setselectedColor] = useState(0);
 
   const fileInputRef = useRef(null);
+  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+  const cloudPreset = import.meta.env.VITE_CLOUDINARY_PRESET;
+  // console.log(cloudName, cloudPreset);
 
   useEffect(() => {
     if (userInfo.profileSetup) {
@@ -29,10 +36,10 @@ const Profile = () => {
       setLastName(userInfo.lastName);
       setselectedColor(userInfo.color);
     }
-    if(userInfo.image){
-      setImage(`${HOST}/${userInfo.image}`);
+    if (userInfo.image) {
+      setImage(userInfo.image.url);
+      setPublicId(userInfo.image.public_id);
     }
-
   }, [userInfo]);
 
   const validateProfile = () => {
@@ -56,6 +63,8 @@ const Profile = () => {
             firstName,
             lastName,
             color: selectedColor,
+            image:
+              image && publicId ? { url: image, public_id: publicId } : null, // include image info if available
           },
           {
             withCredentials: true,
@@ -83,34 +92,58 @@ const Profile = () => {
 
   const handleImageChange = async (e) => {
     const file = e.target.files[0];
-    console.log(file);
-    if(file){
+    if (file) {
       const formData = new FormData();
-      formData.append("profile-image", file);
-      const response = await apiClient.post(ADD_PROFILE_IMAGE_ROUTE,formData,{
-        withCredentials:true,
-      });
-      if(response.status === 200 && response.data.image){
-        setUserInfo({...userInfo,image:response.data.image});
-        toast.success("Image uploaded successfully");
+      formData.append("file", file);
+      formData.append("upload_preset", cloudPreset); // Replace with your Cloudinary upload preset
+      formData.append("cloud_name", cloudName); // Replace with your Cloudinary cloud name
+
+      try {
+        const res = await fetch(
+          `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+          {
+            method: "POST",
+            body: formData,
+          }
+        );
+        const data = await res.json();
+        if (data.secure_url) {
+          setImage(data.secure_url);
+          setPublicId(data.public_id);
+          setUserInfo({
+            ...userInfo,
+            image: { url: data.secure_url, public_id: data.public_id },
+          });
+          toast.success("Image uploaded successfully");
+        }
+      } catch (error) {
+        toast.error("Image upload failed");
+        console.log(error);
       }
     }
-
   };
 
   const handleDeleteImage = async () => {
-    try {
-      const response = await apiClient.delete(REMOVE_PROFILE_IMAGE_ROUTE,{
-        withCredentials:true,
-      });
-      if(response.status === 200){
-        setUserInfo({...userInfo,image:null});
-        toast.success("Image removed successfully");
-        setImage(null);
+    if (publicId) {
+      try {
+        const res = await apiClient.post(
+          REMOVE_PROFILE_IMAGE_ROUTE,
+          { public_id: publicId },
+          { withCredentials: true }
+        );
+
+        if (res.status === 200) {
+          setUserInfo({ ...userInfo, image: null });
+          setImage(null);
+          setPublicId(null);
+          toast.success("Image removed successfully");
+        } else {
+          throw new Error("Image deletion failed");
+        }
+      } catch (error) {
+        toast.error("Failed to delete image");
+        console.log(error);
       }
-    } catch (error) {
-      console.log(error);
-      
     }
   };
 
@@ -139,9 +172,7 @@ const Profile = () => {
                     selectedColor
                   )}`}
                 >
-                  {firstName
-                    ? firstName.split("").shift()
-                    : userInfo.email.split("").shift()}
+                  {firstName ? firstName[0] : userInfo.email[0]}
                 </div>
               )}
               {hovered && (
@@ -161,12 +192,12 @@ const Profile = () => {
                 ref={fileInputRef}
                 className="hidden"
                 onChange={handleImageChange}
-                name="proile-image"
-                accept=".png ,.jpg ,.jpeg, .svg, .webp"
+                name="profile-image"
+                accept=".png, .jpg, .jpeg, .svg, .webp"
               />
             </Avatar>
           </div>
-          <div className="flex  min-w-32 md:min-w-64 flex-col gap-5 text-white items-center justify-center">
+          <div className="flex min-w-32 md:min-w-64 flex-col gap-5 text-white items-center justify-center">
             <div className="w-full">
               <Input
                 type="email"
@@ -209,7 +240,7 @@ const Profile = () => {
         </div>
         <div className="w-full">
           <Button
-            className="h-16 w-full bg-purple-700 hover:bg-purple-900 transition-all duration-300 text-lg md:text-xl "
+            className="h-16 w-full bg-purple-700 hover:bg-purple-900 transition-all duration-300 text-lg md:text-xl"
             onClick={saveChanges}
           >
             Save Changes
