@@ -91,6 +91,23 @@ const setupSocket = (server) => {
     socket.on("sendMessage", sendMessage);
     socket.on("send-channel-message", sendChannelMessage);
     socket.on("disconnect", () => disconnect(socket));
+
+    socket.on("call-user", (data) => {
+      const recipientSocketId = userSocketMap.get(data.recipientId);
+      if (recipientSocketId) {
+        io.to(recipientSocketId).emit("incoming-call", {
+          from: data.from,
+          signal: data.signal,
+        });
+      }
+    });
+
+    socket.on("accept-call", (data) => {
+      const callerSocketId = userSocketMap.get(data.callerId);
+      if (callerSocketId) {
+        io.to(callerSocketId).emit("call-accepted", data.signal);
+      }
+    });
   });
 };
 

@@ -12,6 +12,7 @@ import { IoMdArrowRoundDown } from "react-icons/io";
 import { IoCloseSharp } from "react-icons/io5";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getColor } from "@/lib/utils";
+import { LoaderChat } from "@/components/Loader";
 const MessageContainer = () => {
   const scrollRef = useRef();
   const {
@@ -19,17 +20,17 @@ const MessageContainer = () => {
     selectedChatData,
     selectedChatMessages,
     setSelectedChatMessages,
-    setIsDownloading,
-    setFileDownloadProgress,
     userInfo,
   } = useAppStore();
 
   const [showImage, setShowImage] = useState(false);
   const [imageUrl, setImageUrl] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const getMessages = async () => {
       try {
+        setIsLoading(true);
         const response = await apiClient.post(
           GET_ALL_MESSAGES_ROUTE,
           {
@@ -39,17 +40,21 @@ const MessageContainer = () => {
             withCredentials: true,
           }
         );
-        console.log(response);
+        // console.log(response);
         if (response.data) {
           setSelectedChatMessages(response.data);
+          setIsLoading(false);
         }
       } catch (error) {
         console.log(error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     const getChannelMessages = async () => {
       try {
+        setIsLoading(true);
         const response = await apiClient.get(
           `${GET_CHANNEL_MESSAGES_ROUTE}/${selectedChatData._id}`,
           {
@@ -59,9 +64,12 @@ const MessageContainer = () => {
         if (response.data.messages) {
           // console.log(response.data.messages);
           setSelectedChatMessages(response.data.messages);
+          setIsLoading(false);
         }
       } catch (error) {
         console.log(error);
+      } finally {
+        setIsLoading(false);
       }
     };
     if (selectedChatData._id) {
@@ -105,24 +113,33 @@ const MessageContainer = () => {
   };
 
   const downloadFile = async (fileUrl) => {
-    setIsDownloading(true);
-    setFileDownloadProgress(0);
-    const response = await apiClient.get(`${HOST}/${fileUrl}`, {
-      responseType: "blob",
-      onDownloadProgress: (data) => {
-        setFileDownloadProgress(Math.round((100 * data.loaded) / data.total));
-      },
-    });
-    const urlBlob = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement("a");
-    link.href = urlBlob;
-    link.setAttribute("download", fileUrl.split("/").pop());
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(urlBlob);
-    setIsDownloading(false);
-    setFileDownloadProgress(0);
+    try {
+      // Fetch the file as a blob
+      const response = await fetch(fileUrl);
+
+      // Check if the response is okay
+      if (!response.ok) throw new Error("Failed to fetch file");
+
+      // Convert the response to a blob
+      const blob = await response.blob();
+
+      // Create a temporary anchor element
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+
+      // Set the download attribute with the filename
+      link.setAttribute("download", fileUrl.split("/").pop());
+
+      // Append the anchor to the document, trigger the click, and remove it
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Revoke the object URL after the download starts to free memory
+      URL.revokeObjectURL(link.href);
+    } catch (error) {
+      console.error("An error occurred while downloading the file:", error);
+    }
   };
 
   const renderDMMessages = (message) => {
@@ -276,16 +293,12 @@ const MessageContainer = () => {
 
   return (
     <div className="flex-1 overflow-y-auto scrollbar-hidden p-4 px-8 md:w-[65vw] lg:w-[70vw] xl:w-[80vw] w-full">
-      {renderMessages()}
+      {isLoading ? <LoaderChat /> : renderMessages()}
       <div ref={scrollRef} />
       {showImage && (
         <div className="fixed z-[1000] top-0 left-0 h-[100vh] w-[100vw] flex items-center justify-center backdrop-blur-lg flex-col">
           <div>
-            <img
-              src={`${HOST}/${imageUrl}`}
-              alt=""
-              className="h-[80vh] w-full bg-cover"
-            />
+            <img src={imageUrl} alt="" className="h-[80vh] w-full bg-cover" />
           </div>
           <div className="flex gap-5 fixed top-0 mt-5">
             <button
