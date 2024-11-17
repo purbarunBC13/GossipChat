@@ -9,7 +9,7 @@ import contactsRoutes from "./routes/ContactRoutes.js";
 import setupSocket from "./socket.js";
 import messagesRoutes from "./routes/MessagesRoutes.js";
 import channelRoutes from "./routes/ChannelRoutes.js";
-import { ExpressPeerServer } from "peer";
+import callRoutes from "./routes/CallRoutes.js";
 
 dotenv.config();
 
@@ -33,6 +33,7 @@ app.use(express.json());
 app.use(morgan("dev"));
 
 // ! Routes
+app.use(callRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/contacts", contactsRoutes);
 app.use("/api/messages", messagesRoutes);
@@ -43,11 +44,6 @@ const server = app.listen(port, () => {
 });
 
 setupSocket(server);
-const peerServer = ExpressPeerServer(server, {
-  debug: true,
-  path: "/peerjs",
-});
-app.use("/peerjs", peerServer);
 
 mongoose
   .connect(databaseURL)

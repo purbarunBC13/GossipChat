@@ -87,7 +87,7 @@ const App = () => {
           }
         />
         <Route
-          path="/video/:recipientId"
+          path="/videoCall"
           element={
             <PrivateRoute>
               <VideoCall />

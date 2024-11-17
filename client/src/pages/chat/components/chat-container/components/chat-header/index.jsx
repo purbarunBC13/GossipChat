@@ -47,10 +47,10 @@ const ChatHeader = () => {
               : selectedChatData.email}
           </div>
         </div>
-        <div className="flex items-center justify-center gap-5">
+        <div className="flex items-center justify-center gap-5 cursor-pointer">
           <Video
             onClick={() => {
-              navigate(`/video/${selectedChatData._id}`);
+              navigate(`/videoCall`);
             }}
           />
           <button

@@ -1,9 +1,8 @@
+import IncomingCallNotification from "@/components/incoming-call-notification";
 import { useAppStore } from "@/store";
 import { HOST } from "@/utils/constants";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
-import { Peer } from "peerjs";
-
 const SocketContext = createContext();
 
 export const useSocket = () => {
@@ -12,9 +11,8 @@ export const useSocket = () => {
 
 export const SocketProvider = ({ children }) => {
   const socket = useRef();
-  const peer = useRef(new Peer(undefined, { path: "/peerjs", host: HOST }));
-  const [call, setCall] = useState(null);
-  const { userInfo } = useAppStore();
+  const { userInfo, setCallRoom } = useAppStore();
+  const [incomingCall, setIncomingCall] = useState(null); // State for incoming call
 
   useEffect(() => {
     if (userInfo) {
@@ -24,20 +22,29 @@ export const SocketProvider = ({ children }) => {
           userId: userInfo.id,
         },
       });
+
       socket.current.on("connect", () => {
         console.log("connected to socket server");
       });
 
-      //! Listen for incoming calls
-      socket.current.on("incoming-call", (data) => {
-        setCall({
-          isReceiving: true,
-          from: data.from,
-          signal: data.signal,
-        });
+      // Listen for incoming call
+      socket.current.on("receiveCallRequest", ({ room, userIdentity }) => {
+        console.log(`Incoming call from ${userIdentity} in room ${room}`);
+        setIncomingCall({ room, caller: userIdentity });
       });
 
-      // TODO : ADD NOTIFICATION FOR NEW MESSAGE
+      // Handle call rejection
+      socket.current.on("callRejected", ({ room }) => {
+        console.log(`Call to room ${room} was rejected`);
+        setIncomingCall(null); // Clear the call notification
+      });
+
+      // Handle call acceptance
+      socket.current.on("callAccepted", ({ room }) => {
+        console.log(`Call to room ${room} was accepted`);
+        setCallRoom({ room });
+        setIncomingCall(null); // Clear the call notification
+      });
 
       const handleReceiveMessage = (message) => {
         const { selectedChatData, selectedChatType, addMessage } =
@@ -48,7 +55,6 @@ export const SocketProvider = ({ children }) => {
           (selectedChatData._id === message.sender._id ||
             selectedChatData._id === message.recipient._id)
         ) {
-          // console.log("Received message: ", message);
           addMessage(message);
         }
       };
@@ -61,63 +67,62 @@ export const SocketProvider = ({ children }) => {
           selectedChatType !== undefined &&
           selectedChatData._id === message.channelId
         ) {
-          console.log("Received channel message: ", message);
           addMessage(message);
         }
       };
 
       socket.current.on("receiveMessage", handleReceiveMessage);
-
       socket.current.on("recieve-channel-message", handleReceiveChannelMessage);
+
       return () => {
         socket.current.disconnect();
       };
     }
   }, [userInfo]);
 
-  const callUser = (recipientId, stream) => {
-    if (!peer.current) {
-      console.error("Peer instance is not initialized.");
-      return;
+  // Function to emit a call rejection
+  const rejectCall = (room) => {
+    if (socket.current) {
+      socket.current.emit("rejectCall", { room });
+      setIncomingCall(null); // Clear the call notification
     }
-
-    const call = peer.current.call(recipientId, stream);
-
-    if (!call) {
-      console.error(
-        "Failed to initiate call. Check if recipientId is valid and connected."
-      );
-      return;
-    }
-
-    call.on("stream", (remoteStream) => {
-      document.getElementById("remote-video").srcObject = remoteStream;
-    });
-
-    call.on("error", (err) => {
-      console.error("Error during call:", err);
-    });
   };
 
-  const acceptCall = (stream) => {
-    setCall(null);
-    const call = peer.current.call(call.from, stream);
-    call.answer(call.signal);
+  // Function to emit a call acceptance
+  const acceptCall = () => {
+    if (socket.current && incomingCall?.room) {
+      socket.current.emit("acceptCall", { room: incomingCall.room });
 
-    call.on("stream", (remoteStream) => {
-      document.getElementById("remote-video").srcObject = remoteStream;
-    });
+      // Store the room in global state
+      setCallRoom(incomingCall.room);
 
-    socket.current.emit("accept-call", {
-      callerId: call.from,
-      signal: call,
-    });
+      // Persist callRoom to localStorage
+      localStorage.setItem("callRoom", incomingCall.room);
+
+      setIncomingCall(null); // Clear the incoming call notification
+
+      // Redirect to the video call page
+      window.location.href = "/videoCall";
+    }
   };
+
   return (
     <SocketContext.Provider
-      value={{ socket: socket.current, call, callUser, acceptCall }}
+      value={{
+        socket: socket.current,
+        rejectCall,
+        acceptCall,
+      }}
     >
       {children}
+      {/* Render Notification Component */}
+      {incomingCall && (
+        <IncomingCallNotification
+          incomingCall={incomingCall}
+          acceptCall={acceptCall}
+          rejectCall={rejectCall}
+        />
+      )}
     </SocketContext.Provider>
   );
 };

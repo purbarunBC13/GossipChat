@@ -79,6 +79,17 @@ const setupSocket = (server) => {
     }
   };
 
+  const sendCallRequest = async ({ room, userIdentity }) => {
+    const recipientSocketId = userSocketMap.get(room);
+    console.log(`Sending call request to ${room}`);
+    if (recipientSocketId) {
+      io.to(recipientSocketId).emit("receiveCallRequest", {
+        room,
+        userIdentity,
+      });
+    }
+  };
+
   io.on("connection", (socket) => {
     const userId = socket.handshake.query.userId;
     if (userId) {
@@ -90,24 +101,8 @@ const setupSocket = (server) => {
 
     socket.on("sendMessage", sendMessage);
     socket.on("send-channel-message", sendChannelMessage);
+    socket.on("sendCallRequest", sendCallRequest);
     socket.on("disconnect", () => disconnect(socket));
-
-    socket.on("call-user", (data) => {
-      const recipientSocketId = userSocketMap.get(data.recipientId);
-      if (recipientSocketId) {
-        io.to(recipientSocketId).emit("incoming-call", {
-          from: data.from,
-          signal: data.signal,
-        });
-      }
-    });
-
-    socket.on("accept-call", (data) => {
-      const callerSocketId = userSocketMap.get(data.callerId);
-      if (callerSocketId) {
-        io.to(callerSocketId).emit("call-accepted", data.signal);
-      }
-    });
   });
 };
 
